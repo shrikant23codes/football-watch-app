@@ -392,6 +392,12 @@
       text-overflow: ellipsis;
     }
 
+    .match-item-position {
+      font-size: 11px;
+      color: var(--text-3);
+      letter-spacing: -0.01em;
+    }
+
     .match-item-notes {
       font-size: 12px;
       color: var(--text-2);
@@ -964,6 +970,14 @@
 
         body.appendChild(input);
         body.appendChild(urlSpan);
+
+        if (match.position > 5) {
+          const posBadge = document.createElement('span');
+          posBadge.className = 'match-item-position';
+          posBadge.textContent = `↻ ${fmt(match.position)}`;
+          body.appendChild(posBadge);
+        }
+
         body.appendChild(notes);
 
         const del = document.createElement('button');
@@ -998,7 +1012,7 @@
           activeId = match.id;
           document.querySelectorAll('.match-item').forEach(el => el.classList.remove('is-active'));
           item.classList.add('is-active');
-          loadMatch(match.url, input.value || 'Untitled match');
+          loadMatch(match.url, input.value || 'Untitled match', match.position || 0);
         });
 
         // Delete
@@ -1020,8 +1034,9 @@
     }
 
     // ── Load a match into the player ──────────────────────────
-    function loadMatch(url, title) {
+    function loadMatch(url, title, position = 0) {
       if (!url) return;
+      savePosition(); // save progress of whatever was playing before
       video.src = url;
       video.style.display = 'block';
       videoEmpty.style.display = 'none';
@@ -1032,6 +1047,11 @@
       ctrlProgress.value = 0;
       ctrlTime.textContent = '0:00 / 0:00';
       video.load();
+      if (position > 5) {
+        video.addEventListener('loadedmetadata', () => {
+          video.currentTime = position;
+        }, { once: true });
+      }
     }
 
     // ── Video controls ─────────────────────────────────────────
@@ -1062,6 +1082,23 @@
 
     ctrlFull.addEventListener('click', () => {
       document.fullscreenElement ? document.exitFullscreen() : videoWrap.requestFullscreen();
+    });
+
+    // ── Position saving ────────────────────────────────────────
+    async function savePosition() {
+      if (!activeId || !video.src) return;
+      const pos = Math.floor(video.currentTime);
+      const all = await getData();
+      const m = all.find(m => m.id === activeId);
+      if (m) { m.position = pos; await saveData(all); }
+    }
+
+    video.addEventListener('pause', savePosition);
+    video.addEventListener('ended', async () => {
+      if (!activeId) return;
+      const all = await getData();
+      const m = all.find(m => m.id === activeId);
+      if (m) { m.position = 0; await saveData(all); render(); }
     });
 
     // ── Keyboard shortcuts ─────────────────────────────────────
