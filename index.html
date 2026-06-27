@@ -114,7 +114,6 @@
       right: 0;
       display: none;
       flex-direction: column;
-      gap: 0;
       padding: 28px 14px 12px;
       background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
     }
@@ -393,6 +392,26 @@
       text-overflow: ellipsis;
     }
 
+    .match-item-notes {
+      font-size: 12px;
+      color: var(--text-2);
+      letter-spacing: -0.01em;
+      background: none;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+      padding: 0;
+      resize: none;
+      line-height: 1.5;
+      overflow: hidden;
+      min-height: 18px;
+    }
+
+    .match-item-notes::placeholder {
+      color: var(--text-3);
+    }
+
     .match-item-delete {
       flex-shrink: 0;
       opacity: 0;
@@ -467,6 +486,42 @@
       letter-spacing: -0.01em;
       line-height: 1.8;
     }
+
+    /* ── File status ──────────────────────────── */
+    .file-status {
+      font-size: 11px;
+      color: var(--text-3);
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .file-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border-strong);
+      flex-shrink: 0;
+    }
+
+    .file-status-dot.connected {
+      background: #4caf7d;
+    }
+
+    .file-status-btn {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 11px;
+      color: var(--text-3);
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .file-status-btn:hover { color: var(--text); }
 
     /* ── Modal ────────────────────────────────── */
     .modal-backdrop {
@@ -640,7 +695,13 @@
     <aside class="list-panel">
       <div class="list-header">
         <span class="list-header-label">Matches</span>
-        <button class="btn-add" id="btn-add">+ Add match</button>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="file-status" id="file-status">
+            <span class="file-status-dot" id="file-dot"></span>
+            <span id="file-label">unsaved</span>
+          </span>
+          <button class="btn-add" id="btn-add">+ Add match</button>
+        </div>
       </div>
 
       <div class="match-list" id="match-list"></div>
@@ -657,6 +718,21 @@
     </aside>
 
   </main>
+
+  <!-- Setup modal -->
+  <div class="modal-backdrop" id="setup-modal">
+    <div class="modal-card">
+      <span class="modal-title">Set up data file</span>
+      <p style="font-size:12px;color:var(--text-2);line-height:1.7;">
+        Save your matches to a JSON file on disk — not the browser.<br/>
+        Survives browser clears, can be backed up or synced.
+      </p>
+      <div class="modal-actions" style="justify-content:space-between;">
+        <button class="btn-cancel" id="setup-open">Open existing file</button>
+        <button class="btn-confirm" id="setup-new">Create new file</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Add match modal -->
   <div class="modal-backdrop" id="modal">
@@ -698,16 +774,127 @@
 
     const STORAGE_KEY = 'football-watch-matches';
     let activeId = null;
+    let fileHandle = null;
 
-    // ── Storage ────────────────────────────────────────────────
-    function getData() {
+    // ── IndexedDB — persist file handle across sessions ────────
+    function idbOpen() {
+      return new Promise((res, rej) => {
+        const r = indexedDB.open('football-watch', 1);
+        r.onupgradeneeded = e => e.target.result.createObjectStore('meta');
+        r.onsuccess = e => res(e.target.result);
+        r.onerror = () => rej(r.error);
+      });
+    }
+
+    async function idbGet(key) {
+      try {
+        const db = await idbOpen();
+        return new Promise(res => {
+          const tx = db.transaction('meta', 'readonly');
+          const req = tx.objectStore('meta').get(key);
+          req.onsuccess = () => res(req.result ?? null);
+          req.onerror = () => res(null);
+        });
+      } catch { return null; }
+    }
+
+    async function idbSet(key, val) {
+      try {
+        const db = await idbOpen();
+        return new Promise(res => {
+          const tx = db.transaction('meta', 'readwrite');
+          tx.objectStore('meta').put(val, key);
+          tx.oncomplete = res;
+          tx.onerror = res;
+        });
+      } catch {}
+    }
+
+    // ── File System Access ─────────────────────────────────────
+    async function readFileData(handle) {
+      const file = await handle.getFile();
+      const text = await file.text();
+      return JSON.parse(text || '[]');
+    }
+
+    async function writeFileData(handle, matches) {
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(matches, null, 2));
+      await writable.close();
+    }
+
+    async function verifyPermission(handle) {
+      const opts = { mode: 'readwrite' };
+      if (await handle.queryPermission(opts) === 'granted') return true;
+      if (await handle.requestPermission(opts) === 'granted') return true;
+      return false;
+    }
+
+    function setFileStatus(name) {
+      document.getElementById('file-dot').classList.toggle('connected', !!name);
+      document.getElementById('file-label').textContent = name || 'unsaved';
+    }
+
+    // ── Storage (file-first, localStorage fallback) ────────────
+    async function getData() {
+      if (fileHandle) {
+        try { return await readFileData(fileHandle); } catch {}
+      }
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
       catch { return []; }
     }
 
-    function saveData(matches) {
+    async function saveData(matches) {
+      if (fileHandle) {
+        try { await writeFileData(fileHandle, matches); return; } catch {}
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
     }
+
+    // ── Setup modal ────────────────────────────────────────────
+    const setupModal = document.getElementById('setup-modal');
+
+    function openSetup() { setupModal.classList.add('is-open'); }
+    function closeSetup() { setupModal.classList.remove('is-open'); }
+
+    async function connectHandle(handle) {
+      const ok = await verifyPermission(handle);
+      if (!ok) return false;
+      fileHandle = handle;
+      await idbSet('fileHandle', handle);
+      setFileStatus(handle.name);
+      return true;
+    }
+
+    document.getElementById('setup-new').addEventListener('click', async () => {
+      try {
+        const existing = localStorage.getItem(STORAGE_KEY);
+        const handle = await window.showSaveFilePicker({
+          suggestedName: 'matches.json',
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
+        await connectHandle(handle);
+        // Migrate any localStorage data into the new file
+        if (existing) {
+          await writeFileData(handle, JSON.parse(existing));
+        } else {
+          await writeFileData(handle, []);
+        }
+        closeSetup();
+        await render();
+      } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+    });
+
+    document.getElementById('setup-open').addEventListener('click', async () => {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
+        await connectHandle(handle);
+        closeSetup();
+        await render();
+      } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+    });
 
     // ── Helpers ────────────────────────────────────────────────
     function fmt(secs) {
@@ -732,8 +919,8 @@
     }
 
     // ── Render match list ──────────────────────────────────────
-    function render() {
-      const matches = getData();
+    async function render() {
+      const matches = await getData();
       matchList.innerHTML = '';
 
       if (matches.length === 0) {
@@ -744,7 +931,6 @@
       matches.forEach((match, i) => {
         const item = document.createElement('div');
         item.className = 'match-item' + (match.id === activeId ? ' is-active' : '');
-        item.dataset.id = match.id;
 
         const idx = document.createElement('span');
         idx.className = 'match-item-index';
@@ -763,8 +949,22 @@
         urlSpan.className = 'match-item-url';
         urlSpan.textContent = urlLabel(match.url);
 
+        const notes = document.createElement('textarea');
+        notes.className = 'match-item-notes';
+        notes.value = match.notes || '';
+        notes.placeholder = 'Add notes…';
+        notes.rows = 1;
+        // Auto-expand to content
+        const autoResize = () => {
+          notes.style.height = 'auto';
+          notes.style.height = notes.scrollHeight + 'px';
+        };
+        notes.addEventListener('input', autoResize);
+        setTimeout(autoResize, 0);
+
         body.appendChild(input);
         body.appendChild(urlSpan);
+        body.appendChild(notes);
 
         const del = document.createElement('button');
         del.className = 'match-item-delete';
@@ -779,10 +979,17 @@
         matchList.appendChild(item);
 
         // Save description on edit
-        input.addEventListener('change', () => {
-          const all = getData();
+        input.addEventListener('change', async () => {
+          const all = await getData();
           const m = all.find(m => m.id === match.id);
-          if (m) { m.desc = input.value; saveData(all); }
+          if (m) { m.desc = input.value; await saveData(all); }
+        });
+
+        // Save notes on edit
+        notes.addEventListener('change', async () => {
+          const all = await getData();
+          const m = all.find(m => m.id === match.id);
+          if (m) { m.notes = notes.value; await saveData(all); }
         });
 
         // Click item → load video
@@ -795,7 +1002,7 @@
         });
 
         // Delete
-        del.addEventListener('click', (e) => {
+        del.addEventListener('click', async (e) => {
           e.stopPropagation();
           if (activeId === match.id) {
             activeId = null;
@@ -806,7 +1013,7 @@
             currentTitle.textContent = 'No match selected';
             currentTitle.classList.add('empty');
           }
-          saveData(getData().filter(m => m.id !== match.id));
+          await saveData((await getData()).filter(m => m.id !== match.id));
           render();
         });
       });
@@ -887,16 +1094,16 @@
       modal.classList.remove('is-open');
     }
 
-    function confirmAdd() {
+    async function confirmAdd() {
       const url = modalUrl.value.trim();
       if (!url) { modalUrl.focus(); return; }
       const match = { id: Date.now().toString(), url, desc: modalDesc.value.trim() };
-      const all = getData();
+      const all = await getData();
       all.push(match);
-      saveData(all);
+      await saveData(all);
       closeModal();
       activeId = match.id;
-      render();
+      await render();
       loadMatch(url, match.desc || 'Untitled match');
     }
 
@@ -916,54 +1123,41 @@
 
     // ── Bookmarklet ────────────────────────────────────────────
     const bookmarkletCode = `(function(){
-      var url = null;
-
-      // 1. JWPlayer API (footballia uses JWPlayer)
-      try {
-        if (typeof jwplayer === 'function') {
-          var item = jwplayer().getPlaylistItem();
-          if (item && item.file) url = item.file;
-        }
-      } catch(e) {}
-
-      // 2. Any <video> element — check .src JS property, not just HTML attribute
-      if (!url) {
-        var videos = document.querySelectorAll('video');
-        for (var i = 0; i < videos.length; i++) {
-          if (videos[i].src && videos[i].src.indexOf('mp4') !== -1) {
-            url = videos[i].src;
-            break;
-          }
-        }
-      }
-
-      // 3. Scan page source for the CDN pattern as last resort
-      if (!url) {
-        var m = document.documentElement.innerHTML.match(/https:\\/\\/videos\\.footballia\\.net\\/[^"'\\s]+\\.mp4/);
-        if (m) url = m[0];
-      }
-
-      if (!url) {
-        alert('No video found. Make sure you are logged in and the match video has loaded.');
-        return;
-      }
-
-      navigator.clipboard.writeText(url).then(function() {
-        var d = document.createElement('div');
-        d.textContent = '✓ Video URL copied';
-        d.style.cssText = 'position:fixed;top:20px;right:20px;background:#0f0f0e;color:#f7f7f5;padding:10px 16px;border-radius:6px;font-family:-apple-system,sans-serif;font-size:13px;font-weight:500;z-index:99999;box-shadow:0 2px 12px rgba(0,0,0,0.15);';
-        document.body.appendChild(d);
-        setTimeout(function(){ d.remove(); }, 2000);
-      }).catch(function() {
-        prompt('Copy this URL:', url);
-      });
+      var url=null;
+      try{if(typeof jwplayer==='function'){var item=jwplayer().getPlaylistItem();if(item&&item.file)url=item.file;}}catch(e){}
+      if(!url){var vids=document.querySelectorAll('video');for(var i=0;i<vids.length;i++){if(vids[i].src&&vids[i].src.indexOf('mp4')!==-1){url=vids[i].src;break;}}}
+      if(!url){var m=document.documentElement.innerHTML.match(/https:\\/\\/videos\\.footballia\\.net\\/[^"'\\s]+\\.mp4/);if(m)url=m[0];}
+      if(!url){alert('No video found. Make sure you are logged in and the match video has loaded.');return;}
+      navigator.clipboard.writeText(url).then(function(){var d=document.createElement('div');d.textContent='✓ Video URL copied';d.style.cssText='position:fixed;top:20px;right:20px;background:#0f0f0e;color:#f7f7f5;padding:10px 16px;border-radius:6px;font-family:-apple-system,sans-serif;font-size:13px;font-weight:500;z-index:99999;box-shadow:0 2px 12px rgba(0,0,0,0.15);';document.body.appendChild(d);setTimeout(function(){d.remove();},2000);}).catch(function(){prompt('Copy this URL:',url);});
     })();`;
 
     document.getElementById('bookmarklet-link').href =
       'javascript:' + encodeURIComponent(bookmarkletCode);
 
     // ── Init ───────────────────────────────────────────────────
-    render();
+    (async () => {
+      // Try to restore previously chosen file handle
+      const stored = await idbGet('fileHandle');
+      if (stored) {
+        const ok = await verifyPermission(stored).catch(() => false);
+        if (ok) {
+          fileHandle = stored;
+          setFileStatus(stored.name);
+        } else {
+          // Permission needs re-granting — show a reconnect button
+          document.getElementById('file-label').innerHTML =
+            '<button class="file-status-btn" id="reconnect-btn">reconnect file</button>';
+          document.getElementById('reconnect-btn').addEventListener('click', async () => {
+            const ok = await verifyPermission(stored).catch(() => false);
+            if (ok) { fileHandle = stored; setFileStatus(stored.name); await render(); }
+          });
+        }
+      } else {
+        // First time — show setup modal
+        openSetup();
+      }
+      await render();
+    })();
   </script>
 
 </body>
