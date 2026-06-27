@@ -612,7 +612,7 @@
     <div class="modal-card">
       <span class="modal-title">Add match</span>
       <div class="modal-field">
-        <label class="modal-label" for="modal-url">Video URL</label>
+        <label class="modal-label" for="modal-url">Video URL (.mp4)</label>
         <input class="modal-input" id="modal-url" type="url"
                placeholder="https://videos.footballia.net/…" autocomplete="off" />
       </div>
@@ -844,8 +844,6 @@
       all.push(match);
       saveData(all);
       closeModal();
-      render();
-      // Auto-load the newly added match
       activeId = match.id;
       render();
       loadMatch(url, match.desc || 'Untitled match');
