@@ -398,6 +398,132 @@
       letter-spacing: -0.01em;
     }
 
+    /* ── Watched toggle ───────────────────────── */
+    .watched-toggle {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      background: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin-top: 1px;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .watched-toggle svg { display: none; }
+
+    .watched-toggle.is-watched {
+      background: var(--text);
+      border-color: var(--text);
+    }
+
+    .watched-toggle.is-watched svg { display: block; }
+
+    .match-item.is-watched .match-item-desc {
+      color: var(--text-2);
+    }
+
+    /* ── Clips ────────────────────────────────── */
+    .clip-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 2px;
+    }
+
+    .clip-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .clip-time {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+      transition: border-color 0.1s, color 0.1s;
+    }
+
+    .clip-time:hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    .clip-note {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text-2);
+      letter-spacing: -0.01em;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .clip-delete {
+      flex-shrink: 0;
+      opacity: 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-3);
+      padding: 1px;
+      line-height: 1;
+      border-radius: 2px;
+      transition: opacity 0.1s, color 0.1s;
+    }
+
+    .clip-item:hover .clip-delete { opacity: 1; }
+    .clip-delete:hover { color: var(--text); }
+
+    .clip-add-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 1px;
+    }
+
+    .clip-time-label {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+    }
+
+    .clip-add-input {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text);
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--border-strong);
+      outline: none;
+      font-family: inherit;
+      padding: 0 0 1px;
+      letter-spacing: -0.01em;
+    }
+
+    .clip-add-input::placeholder { color: var(--text-3); }
+
     .match-item-notes {
       font-size: 12px;
       color: var(--text-2);
@@ -693,6 +819,8 @@
           <span class="shortcuts-label">5s seek</span>
           <kbd class="kbd" style="margin-left:4px;">f</kbd>
           <span class="shortcuts-label">fullscreen</span>
+          <kbd class="kbd" style="margin-left:4px;">n</kbd>
+          <span class="shortcuts-label">clip</span>
         </div>
       </div>
     </section>
@@ -968,6 +1096,11 @@
         notes.addEventListener('input', autoResize);
         setTimeout(autoResize, 0);
 
+        const watched = document.createElement('button');
+        watched.className = 'watched-toggle' + (match.watched ? ' is-watched' : '');
+        watched.title = match.watched ? 'Mark as unwatched' : 'Mark as watched';
+        watched.innerHTML = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#f7f7f5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4.5 3.5,7 8,2"/></svg>`;
+
         body.appendChild(input);
         body.appendChild(urlSpan);
 
@@ -978,6 +1111,50 @@
           body.appendChild(posBadge);
         }
 
+        const clipList = document.createElement('div');
+        clipList.className = 'clip-list';
+        clipList.dataset.matchId = match.id;
+
+        (match.clips || []).forEach(clip => {
+          const row = document.createElement('div');
+          row.className = 'clip-item';
+
+          const ct = document.createElement('button');
+          ct.className = 'clip-time';
+          ct.textContent = fmt(clip.t);
+          ct.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (activeId !== match.id) {
+              activeId = match.id;
+              document.querySelectorAll('.match-item').forEach(el => el.classList.remove('is-active'));
+              item.classList.add('is-active');
+              loadMatch(match.url, input.value || 'Untitled match', clip.t);
+            } else {
+              video.currentTime = clip.t;
+            }
+          });
+
+          const cn = document.createElement('span');
+          cn.className = 'clip-note';
+          cn.textContent = clip.note;
+
+          const cd = document.createElement('button');
+          cd.className = 'clip-delete';
+          cd.title = 'Remove clip';
+          cd.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="2" y1="2" x2="9" y2="9"/><line x1="9" y1="2" x2="2" y2="9"/></svg>`;
+          cd.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const all = await getData();
+            const m = all.find(m => m.id === match.id);
+            if (m) { m.clips = (m.clips || []).filter(c => c.id !== clip.id); await saveData(all); }
+            render();
+          });
+
+          row.appendChild(ct); row.appendChild(cn); row.appendChild(cd);
+          clipList.appendChild(row);
+        });
+
+        body.appendChild(clipList);
         body.appendChild(notes);
 
         const del = document.createElement('button');
@@ -988,9 +1165,22 @@
         </svg>`;
 
         item.appendChild(idx);
+        item.appendChild(watched);
         item.appendChild(body);
         item.appendChild(del);
         matchList.appendChild(item);
+
+        // Watched toggle
+        watched.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const all = await getData();
+          const m = all.find(m => m.id === match.id);
+          if (m) { m.watched = !m.watched; await saveData(all); }
+          match.watched = !match.watched;
+          watched.classList.toggle('is-watched', match.watched);
+          item.classList.toggle('is-watched', match.watched);
+          watched.title = match.watched ? 'Mark as unwatched' : 'Mark as watched';
+        });
 
         // Save description on edit
         input.addEventListener('change', async () => {
@@ -1008,7 +1198,7 @@
 
         // Click item → load video
         item.addEventListener('click', (e) => {
-          if (e.target.closest('.match-item-delete')) return;
+          if (e.target.closest('.match-item-delete') || e.target.closest('.watched-toggle') || e.target.closest('.clip-item') || e.target.closest('.clip-add-row')) return;
           activeId = match.id;
           document.querySelectorAll('.match-item').forEach(el => el.classList.remove('is-active'));
           item.classList.add('is-active');
@@ -1084,6 +1274,53 @@
       document.fullscreenElement ? document.exitFullscreen() : videoWrap.requestFullscreen();
     });
 
+    // ── Clip input ─────────────────────────────────────────────
+    function addClipInput() {
+      if (!activeId || !video.src) return;
+      const clipList = document.querySelector(`.clip-list[data-match-id="${activeId}"]`);
+      if (!clipList) return;
+      if (clipList.querySelector('.clip-add-row')) return; // already open
+
+      const t = Math.floor(video.currentTime);
+      video.pause();
+
+      const row = document.createElement('div');
+      row.className = 'clip-add-row';
+
+      const timeLabel = document.createElement('span');
+      timeLabel.className = 'clip-time-label';
+      timeLabel.textContent = fmt(t);
+
+      const inp = document.createElement('input');
+      inp.className = 'clip-add-input';
+      inp.placeholder = 'describe this moment…';
+      inp.type = 'text';
+
+      row.appendChild(timeLabel);
+      row.appendChild(inp);
+      clipList.appendChild(row);
+      inp.focus();
+
+      inp.addEventListener('keydown', async (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          const note = inp.value.trim();
+          row.remove();
+          if (!note) return;
+          const all = await getData();
+          const m = all.find(m => m.id === activeId);
+          if (m) {
+            if (!m.clips) m.clips = [];
+            m.clips.push({ id: Date.now().toString(), t, note });
+            await saveData(all);
+          }
+          await render();
+        } else if (e.key === 'Escape') {
+          row.remove();
+        }
+      });
+    }
+
     // ── Position saving ────────────────────────────────────────
     async function savePosition() {
       if (!activeId || !video.src) return;
@@ -1116,6 +1353,9 @@
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault(); e.stopPropagation();
         document.fullscreenElement ? document.exitFullscreen() : videoWrap.requestFullscreen();
+      } else if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault(); e.stopPropagation();
+        addClipInput();
       }
     }, { capture: true });
 
