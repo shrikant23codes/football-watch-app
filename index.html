@@ -418,17 +418,122 @@
     .empty-state {
       padding: 48px 24px;
       text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
     }
 
     .empty-state p {
       font-size: 12px;
       color: var(--text-3);
       letter-spacing: -0.01em;
-      line-height: 1.6;
+      line-height: 1.8;
+    }
+
+    /* ── Modal ────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15,15,14,0.25);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.is-open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+
+    .modal-title {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+    }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .modal-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-2);
+      letter-spacing: 0.02em;
+    }
+
+    .modal-input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      letter-spacing: -0.01em;
+      transition: border-color 0.1s;
+    }
+
+    .modal-input:focus {
+      border-color: var(--border-strong);
+    }
+
+    .modal-input::placeholder {
+      color: var(--text-3);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding-top: 4px;
+    }
+
+    .btn-cancel {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: border-color 0.1s;
+    }
+
+    .btn-cancel:hover {
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    .btn-confirm {
+      background: var(--text);
+      border: none;
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      color: var(--bg);
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+
+    .btn-confirm:hover {
+      opacity: 0.8;
     }
   </style>
 </head>
@@ -497,59 +602,37 @@
         <button class="btn-add" id="btn-add">+ Add match</button>
       </div>
 
-      <div class="match-list" id="match-list">
-
-        <!-- Sample items with real test URL on item 1 — will be replaced by JS in step 3 -->
-        <div class="match-item"
-             data-url="https://videos.footballia.net/uploads/video/source_file/36584/2015-16_At._Madrid_-_R._Madrid.mp4"
-             data-title="Atlético Madrid vs Real Madrid">
-          <span class="match-item-index">01</span>
-          <div class="match-item-body">
-            <input class="match-item-desc" type="text" value="Atlético Madrid vs Real Madrid" placeholder="Match description" />
-            <span class="match-item-url">footballia.eu · La Liga 2015–16</span>
-          </div>
-          <button class="match-item-delete" title="Remove">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4">
-              <line x1="2" y1="2" x2="11" y2="11" /><line x1="11" y1="2" x2="2" y2="11" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="match-item" data-url="" data-title="Barcelona vs Bayern Munich">
-          <span class="match-item-index">02</span>
-          <div class="match-item-body">
-            <input class="match-item-desc" type="text" value="Barcelona vs Bayern Munich" placeholder="Match description" />
-            <span class="match-item-url">footballia.eu · UCL Semi-final 2015</span>
-          </div>
-          <button class="match-item-delete" title="Remove">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4">
-              <line x1="2" y1="2" x2="11" y2="11" /><line x1="11" y1="2" x2="2" y2="11" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="match-item" data-url="" data-title="">
-          <span class="match-item-index">03</span>
-          <div class="match-item-body">
-            <input class="match-item-desc" type="text" value="" placeholder="Add a description…" />
-            <span class="match-item-url">footballia.eu · example entry</span>
-          </div>
-          <button class="match-item-delete" title="Remove">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4">
-              <line x1="2" y1="2" x2="11" y2="11" /><line x1="11" y1="2" x2="2" y2="11" />
-            </svg>
-          </button>
-        </div>
-
-      </div>
+      <div class="match-list" id="match-list"></div>
     </aside>
 
   </main>
+
+  <!-- Add match modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal-card">
+      <span class="modal-title">Add match</span>
+      <div class="modal-field">
+        <label class="modal-label" for="modal-url">Video URL</label>
+        <input class="modal-input" id="modal-url" type="url"
+               placeholder="https://videos.footballia.net/…" autocomplete="off" />
+      </div>
+      <div class="modal-field">
+        <label class="modal-label" for="modal-desc">Description</label>
+        <input class="modal-input" id="modal-desc" type="text"
+               placeholder="e.g. Atlético vs Real Madrid, La Liga 2015–16" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="modal-cancel">Cancel</button>
+        <button class="btn-confirm" id="modal-confirm">Add match</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const video        = document.getElementById('video-player');
     const videoEmpty   = document.getElementById('video-empty');
     const videoWrap    = document.getElementById('video-wrap');
+    const videoControls = document.getElementById('video-controls');
     const currentTitle = document.getElementById('current-title');
     const matchList    = document.getElementById('match-list');
     const ctrlPlay     = document.getElementById('ctrl-play');
@@ -558,6 +641,22 @@
     const ctrlFull     = document.getElementById('ctrl-fullscreen');
     const iconPlay     = document.getElementById('icon-play');
     const iconPause    = document.getElementById('icon-pause');
+    const modal        = document.getElementById('modal');
+    const modalUrl     = document.getElementById('modal-url');
+    const modalDesc    = document.getElementById('modal-desc');
+
+    const STORAGE_KEY = 'football-watch-matches';
+    let activeId = null;
+
+    // ── Storage ────────────────────────────────────────────────
+    function getData() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+      catch { return []; }
+    }
+
+    function saveData(matches) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
+    }
 
     // ── Helpers ────────────────────────────────────────────────
     function fmt(secs) {
@@ -567,13 +666,117 @@
       return `${m}:${s}`;
     }
 
+    function urlLabel(url) {
+      try {
+        const u = new URL(url);
+        const file = u.pathname.split('/').filter(Boolean).pop() || u.hostname;
+        return `${u.hostname} · ${file}`;
+      } catch { return url; }
+    }
+
     function setPlayIcon(playing) {
       iconPlay.style.display  = playing ? 'none' : '';
       iconPause.style.display = playing ? '' : 'none';
       videoWrap.classList.toggle('is-playing', playing);
     }
 
-    // ── Play / pause ───────────────────────────────────────────
+    // ── Render match list ──────────────────────────────────────
+    function render() {
+      const matches = getData();
+      matchList.innerHTML = '';
+
+      if (matches.length === 0) {
+        matchList.innerHTML = '<div class="empty-state"><p>No matches yet.<br/>Click "+ Add match" to add one.</p></div>';
+        return;
+      }
+
+      matches.forEach((match, i) => {
+        const item = document.createElement('div');
+        item.className = 'match-item' + (match.id === activeId ? ' is-active' : '');
+        item.dataset.id = match.id;
+
+        const idx = document.createElement('span');
+        idx.className = 'match-item-index';
+        idx.textContent = String(i + 1).padStart(2, '0');
+
+        const body = document.createElement('div');
+        body.className = 'match-item-body';
+
+        const input = document.createElement('input');
+        input.className = 'match-item-desc';
+        input.type = 'text';
+        input.value = match.desc;
+        input.placeholder = 'Add a description…';
+
+        const urlSpan = document.createElement('span');
+        urlSpan.className = 'match-item-url';
+        urlSpan.textContent = urlLabel(match.url);
+
+        body.appendChild(input);
+        body.appendChild(urlSpan);
+
+        const del = document.createElement('button');
+        del.className = 'match-item-delete';
+        del.title = 'Remove';
+        del.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4">
+          <line x1="2" y1="2" x2="11" y2="11"/><line x1="11" y1="2" x2="2" y2="11"/>
+        </svg>`;
+
+        item.appendChild(idx);
+        item.appendChild(body);
+        item.appendChild(del);
+        matchList.appendChild(item);
+
+        // Save description on edit
+        input.addEventListener('change', () => {
+          const all = getData();
+          const m = all.find(m => m.id === match.id);
+          if (m) { m.desc = input.value; saveData(all); }
+        });
+
+        // Click item → load video
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('.match-item-delete')) return;
+          activeId = match.id;
+          document.querySelectorAll('.match-item').forEach(el => el.classList.remove('is-active'));
+          item.classList.add('is-active');
+          loadMatch(match.url, input.value || 'Untitled match');
+        });
+
+        // Delete
+        del.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (activeId === match.id) {
+            activeId = null;
+            video.src = '';
+            video.style.display = 'none';
+            videoEmpty.style.display = '';
+            videoControls.style.display = 'none';
+            currentTitle.textContent = 'No match selected';
+            currentTitle.classList.add('empty');
+          }
+          saveData(getData().filter(m => m.id !== match.id));
+          render();
+        });
+      });
+    }
+
+    // ── Load a match into the player ──────────────────────────
+    function loadMatch(url, title) {
+      if (!url) return;
+      video.src = url;
+      video.style.display = 'block';
+      videoEmpty.style.display = 'none';
+      videoControls.style.display = 'flex';
+      currentTitle.textContent = title;
+      currentTitle.classList.remove('empty');
+      setPlayIcon(false);
+      ctrlProgress.value = 0;
+      ctrlTime.textContent = '0:00 / 0:00';
+      video.load();
+    }
+
+    // ── Video controls ─────────────────────────────────────────
     function togglePlay() {
       if (!video.src) return;
       video.paused ? video.play() : video.pause();
@@ -582,12 +785,9 @@
     video.addEventListener('play',  () => setPlayIcon(true));
     video.addEventListener('pause', () => setPlayIcon(false));
     video.addEventListener('ended', () => setPlayIcon(false));
-
-    // Click on the video area (not controls) also toggles play
     video.addEventListener('click', togglePlay);
     ctrlPlay.addEventListener('click', togglePlay);
 
-    // ── Progress bar ───────────────────────────────────────────
     video.addEventListener('timeupdate', () => {
       if (!video.duration) return;
       ctrlProgress.value = (video.currentTime / video.duration) * 100;
@@ -598,81 +798,75 @@
       ctrlTime.textContent = `0:00 / ${fmt(video.duration)}`;
     });
 
-    let isScrubbing = false;
-    ctrlProgress.addEventListener('mousedown', () => { isScrubbing = true; });
     ctrlProgress.addEventListener('input', () => {
       video.currentTime = (ctrlProgress.value / 100) * (video.duration || 0);
     });
-    ctrlProgress.addEventListener('mouseup', () => { isScrubbing = false; });
 
-    // ── Fullscreen ─────────────────────────────────────────────
     ctrlFull.addEventListener('click', () => {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        videoWrap.requestFullscreen();
-      }
+      document.fullscreenElement ? document.exitFullscreen() : videoWrap.requestFullscreen();
     });
 
-    // ── Keyboard shortcuts (single source of truth) ────────────
-    // Using capture phase so this fires before any element's own handler,
-    // and we stop propagation — no native video keyboard handling can interfere.
+    // ── Keyboard shortcuts ─────────────────────────────────────
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (!video.src) return;
-
       if (e.key === ' ') {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePlay();
+        e.preventDefault(); e.stopPropagation(); togglePlay();
       } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         video.currentTime = Math.max(0, video.currentTime - 5);
       } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 5);
       } else if (e.key === 'f' || e.key === 'F') {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         document.fullscreenElement ? document.exitFullscreen() : videoWrap.requestFullscreen();
       }
     }, { capture: true });
 
-    // ── Load a match into the player ──────────────────────────
-    function loadMatch(url, title) {
-      if (!url) return;
-
-      video.src = url;
-      video.style.display = 'block';
-      videoEmpty.style.display = 'none';
-      document.getElementById('video-controls').style.display = 'flex';
-
-      currentTitle.textContent = title || 'Untitled match';
-      currentTitle.classList.remove('empty');
-
-      setPlayIcon(false);
-      ctrlProgress.value = 0;
-      ctrlTime.textContent = '0:00 / 0:00';
-      video.load();
+    // ── Modal ──────────────────────────────────────────────────
+    function openModal() {
+      modalUrl.value = '';
+      modalDesc.value = '';
+      modal.classList.add('is-open');
+      setTimeout(() => modalUrl.focus(), 50);
     }
 
-    // ── Match item click delegation ────────────────────────────
-    matchList.addEventListener('click', (e) => {
-      if (e.target.closest('.match-item-delete')) return;
+    function closeModal() {
+      modal.classList.remove('is-open');
+    }
 
-      const item = e.target.closest('.match-item');
-      if (!item) return;
+    function confirmAdd() {
+      const url = modalUrl.value.trim();
+      if (!url) { modalUrl.focus(); return; }
+      const match = { id: Date.now().toString(), url, desc: modalDesc.value.trim() };
+      const all = getData();
+      all.push(match);
+      saveData(all);
+      closeModal();
+      render();
+      // Auto-load the newly added match
+      activeId = match.id;
+      render();
+      loadMatch(url, match.desc || 'Untitled match');
+    }
 
-      document.querySelectorAll('.match-item').forEach(el => el.classList.remove('is-active'));
-      item.classList.add('is-active');
+    document.getElementById('btn-add').addEventListener('click', openModal);
+    document.getElementById('modal-cancel').addEventListener('click', closeModal);
+    document.getElementById('modal-confirm').addEventListener('click', confirmAdd);
 
-      const url   = item.dataset.url;
-      const desc  = item.querySelector('.match-item-desc');
-      const title = desc ? desc.value || desc.placeholder : item.dataset.title;
-      loadMatch(url, title);
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    // Close on Escape, confirm on Enter
+    document.addEventListener('keydown', (e) => {
+      if (!modal.classList.contains('is-open')) return;
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Enter') confirmAdd();
     });
+
+    // ── Init ───────────────────────────────────────────────────
+    render();
   </script>
 
 </body>
