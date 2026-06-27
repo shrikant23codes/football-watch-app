@@ -1,6 +1,6 @@
 # Football Watch
 
-A minimal personal archive for watching football match videos from [footballia.net](https://footballia.net). Single `index.html` file — no framework, no build step, no server required.
+A minimal personal archive for watching football match videos. Single `index.html` file — no framework, no build step, no server required.
 
 ![Football Watch App](screenshots/app_1.png)
 
